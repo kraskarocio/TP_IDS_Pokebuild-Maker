@@ -25,6 +25,8 @@ BUILDS_QUERY = "SELECT * FROM BUILDS"
 BUILD_ID_ROUTE = '/api/build/<build_id>/'
 BUILD_ID_QUERY = "SELECT * FROM BUILDS WHERE ID = "
 
+BUILDS_POST_ROUTE = '/api/builds_post/'
+
 USERS_ROUTE = '/api/users_profiles/'
 USERS_QUERY = "SELECT u.id, u.username, u.profile_picture, (SELECT COUNT(*) FROM POKEMON p WHERE p.owner_id = u.id) AS pokemon_count, (SELECT COUNT(*) FROM BUILDS b WHERE b.owner_id = u.id) AS build_count FROM USER u;"
 USER_ID_ROUTE = '/api/user_profile/<user_id>/'
@@ -130,9 +132,16 @@ def id_must_be_an_integer(id, field_name):
         raise ValueError(f"{field_name} must be an integer")
 
 # POST endpoint for adding a new BUILD
-@api_blueprint.route(BUILDS_ROUTE, methods=['POST'])
+@api_blueprint.route('/api/build_post/', methods=['POST'])
 def add_build():
-    data_build = request.json
+    # Log the raw query string
+    print("Query string:", request.query_string.decode('utf-8'))
+        
+    # Retrieve data from query parameters
+    data_build = request.args
+    print("Parsed query parameters:", data_build)
+    if not data_build:
+        return jsonify({'error': 'Missing request body'})
     build_name = data_build.get('build_name', '')
     owner_id = id_must_be_an_integer(data_build.get('owner_id'), 'owner_id')
     pokemon_id_1 = id_must_be_an_integer(data_build.get('pokemon_id_1'), 'pokemon_id_1')
@@ -176,7 +185,7 @@ def add_build():
                 'pokemon_id_6': pokemon_id_6,
                 'timestamp': timestamp
             })
-        return jsonify({'message': 'Build added successfully'})
+        return jsonify(data_build)
     
     except SQLAlchemyError as e:
         error = str(e.__dict__['orig'])
@@ -210,7 +219,7 @@ def register():
                 'email': email,
                 'profile_picture': profile_picture
             }
-        return jsonify({"message": "User registered successfully"})
+        return jsonify({"message": "User registered successfully"}), 200
 
     except SQLAlchemyError as e:
         error = str(e.__dict__['orig'])
@@ -248,3 +257,70 @@ def login():
         return jsonify({'error': error}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
+#POST endpoint for adding a new USER   
+@api_blueprint.route('/api/add_user/', methods=['POST'])
+def add_user():
+    data_user = request.json
+    username = data_user.get('username')
+    password = data_user.get('password')
+    email = data_user.get('email')
+    profile_picture = data_user.get('profile_picture')
+
+    if not username or not password or not email:
+        return jsonify({'error': 'Missing required fields (username, password, email)'})
+
+    try:
+        with engine.connect() as connection:
+            add_user_query = "INSERT INTO USER (username, password, email, profile_picture) VALUES"
+        connection.execute(add_user_query, (username, password, email, profile_picture))
+
+        return jsonify({'message':'User added successfully'}), 200
+    except SQLAlchemyError as e:
+        error = str(e)
+        return jsonify({'error': error}), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+#POST endpoint for modify an existing USER
+@api_blueprint.route('/api/mod_user/<user_id>', methods=['MODIFY'])
+def mod_user(user_id):
+    data_user = request.json
+    username = data_user.get('username')
+    password = data_user.get('password')
+    email = data_user.get('email')
+    profile_picture = data_user.get('profile_picture')
+
+    if not username or not password or not email:
+        return jsonify({'error': 'Missing required fields (username, password, email)'})
+
+    try:
+        with engine.connect() as connection:
+            mod_user_query = "UPDATE USER SET username, password, email, profile_picture WHERE id"
+            connection.execute(mod_user_query, (username, password, email, profile_picture, user_id))
+
+        return jsonify({'message': f'User with id {user_id} modified successfully'})
+
+    except SQLAlchemyError as e:
+        error = str(e.__dict__['orig'])
+        return jsonify({'error': error})
+    
+#POST endpoint to delete a user
+@api_blueprint.route('/api/del_user/<int:user_id>', methods=['DELETE'])
+def del_user(user_id):
+    try:
+        with engine.connect() as connection:
+            del_user_query = "DELETE FROM USER WHERE id = :user_id"
+            connection.execute(text(del_user_query), {'user_id': user_id})
+        
+        return jsonify({'message': f'User with ID {user_id} deleted successfully'})
+
+    except SQLAlchemyError as e:
+        error = str(e.__dict__['orig'])
+        return jsonify({'error': error})
+
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+# POST endpoint for adding a new BUILD

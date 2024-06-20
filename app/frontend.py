@@ -18,10 +18,13 @@ def get_pokemon_id(build):
     ]
 
 def get_pokedex_id(pokemon_list, pokemons):
-    return [
-        '000' if pokemon_id == -1 else str(pokemons[pokemon_id - 1]['pokedex_id']).zfill(3)
-        for pokemon_id in pokemon_list
-    ]
+    result = []
+    for pokemon_id in pokemon_list:
+        if pokemon_id == -1 or pokemon_id - 1 >= len(pokemons):
+            result.append('000')
+        else:
+            result.append(str(pokemons[pokemon_id - 1]['pokedex_id']).zfill(3))
+    return result
 
 def get_build_dict(builds, pokemons):
     build_dict = {}
